@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { Alert, Button, Flex, Form, ScrollArea, SegmentedControl, Switch, Tabs, TabsContent } from '@cherrystudio/ui'
 import { loggerService } from '@logger'
 import CollapsibleSearchBar from '@renderer/components/CollapsibleSearchBar'
+import { ErrorDetailAction } from '@renderer/components/ErrorDetailAction'
 import DeleteIcon from '@renderer/components/icons/DeleteIcon'
 import { SettingContainer, SettingDivider, SettingTitle } from '@renderer/components/SettingsPrimitives'
 import { useSharedCacheValue } from '@renderer/data/hooks/useCache'
@@ -284,7 +285,7 @@ const McpSettingsContent: React.FC<McpSettingsContentProps> = ({ server, updateM
           await ipcApi.request('mcp.server.restart', { serverId: server.id })
           toast.success(t('settings.mcp.updateSuccess'))
           setIsFormChanged(false)
-        } catch (error: any) {
+        } catch (error: unknown) {
           toast.errorFromException(error, { category: 'mcp', mcpServer: server })
         }
       } else {
@@ -534,6 +535,15 @@ const McpSettingsContent: React.FC<McpSettingsContentProps> = ({ server, updateM
               showIcon
               message={t('settings.mcp.runtimeStatus.unavailable', 'Server unavailable')}
               description={runtimeError}
+              action={
+                <ErrorDetailAction
+                  error={runtimeError}
+                  message={runtimeError}
+                  source="mcp"
+                  operation="mcp.runtime"
+                  recordId={server.id}
+                />
+              }
             />
           ) : (
             <McpToolsSection
