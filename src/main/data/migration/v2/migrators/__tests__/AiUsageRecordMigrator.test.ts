@@ -1,4 +1,4 @@
-import { setupTestDatabase, withRoot } from '@test-helpers/db'
+import { setupTestDatabase, withRoot, seedSessionRoot } from '@test-helpers/db'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 
@@ -129,6 +129,7 @@ describe('AiUsageRecordMigrator', () => {
     dbh.db
       .insert(agentSessionMessageTable)
       .values({
+        parentId: seedSessionRoot(dbh.db, 'session-1'),
         id: agentMessageId,
         sessionId: 'session-1',
         role: 'assistant',

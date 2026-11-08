@@ -1,7 +1,7 @@
 import '@data/services/AgentSessionMessageService'
 import path from 'path'
 
-import { setupTestDatabase } from '@test-helpers/db'
+import { setupTestDatabase, seedSessionRoot } from '@test-helpers/db'
 import { resolveMigrationsPath } from '@test-helpers/db/internal/migrationsPath'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
@@ -81,6 +81,7 @@ describe('AgentSessionService', () => {
 
   async function insertSessionMessage(sessionId: string, id: string) {
     await dbh.db.insert(agentSessionMessageTable).values({
+      parentId: seedSessionRoot(dbh.db, sessionId),
       id,
       sessionId,
       role: 'user',
@@ -1530,7 +1531,12 @@ describe('AgentSessionService', () => {
     expect(agentSessionService.listByCursor().items.map((session) => session.id)).toEqual([
       'session-independent-restore'
     ])
-    expect(await dbh.db.select().from(agentSessionMessageTable)).toHaveLength(1)
+    expect(
+      await dbh.db
+        .select()
+        .from(agentSessionMessageTable)
+        .where(eq(agentSessionMessageTable.id, 'message-independent-restore'))
+    ).toHaveLength(1)
   })
 
   it('rejects permanent deletion of an active session and keeps it active', async () => {

@@ -1,5 +1,5 @@
 import { setupTestDatabase } from '@test-helpers/db'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, ne, sql } from 'drizzle-orm'
 import { validate as isUuid } from 'uuid'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,6 +12,7 @@ import {
 import { agentWorkspaceTable } from '@data/db/schemas/agentWorkspace'
 import { userModelTable } from '@data/db/schemas/userModel'
 import { userProviderTable } from '@data/db/schemas/userProvider'
+import { ensureAgentSessionRootTx } from '@data/services/agentSessionMessageTree'
 
 import { importLegacySessionMessages } from '../AgentsMigrator'
 import { createEmptyAgentsSchemaInfo } from '../mappings/AgentsDbMappings'
@@ -168,7 +169,7 @@ describe('importLegacySessionMessages', () => {
     const [row] = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-legacy'))
+      .where(and(eq(agentSessionMessageTable.sessionId, 's-legacy'), ne(agentSessionMessageTable.role, 'root')))
     expect(row.id).not.toBe('1')
     expect(isUuid(row.id)).toBe(true)
     expect(row.data).toEqual({ parts: [{ type: 'text', text: 'hello' }] })
@@ -212,7 +213,7 @@ describe('importLegacySessionMessages', () => {
     const [{ count }] = dbh.db
       .select({ count: sql<number>`count(*)` })
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-paged'))
+      .where(and(eq(agentSessionMessageTable.sessionId, 's-paged'), ne(agentSessionMessageTable.role, 'root')))
       .all()
     expect(count).toBe(101)
   })
@@ -240,7 +241,7 @@ describe('importLegacySessionMessages', () => {
     const [row] = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-blocks'))
+      .where(and(eq(agentSessionMessageTable.sessionId, 's-blocks'), ne(agentSessionMessageTable.role, 'root')))
     expect(row.status).toBe('error')
     expect(row.searchableText).toBe('hello world')
     expect(row.data.parts?.[0]).toMatchObject({ type: 'text', text: 'hello world', state: 'done' })
@@ -287,7 +288,9 @@ describe('importLegacySessionMessages', () => {
     const [imported] = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-searchable-semantics'))
+      .where(
+        and(eq(agentSessionMessageTable.sessionId, 's-searchable-semantics'), ne(agentSessionMessageTable.role, 'root'))
+      )
     expect(imported.searchableText).toBe('visible phrase')
 
     await dbh.db
@@ -373,7 +376,7 @@ describe('importLegacySessionMessages', () => {
     const [row] = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-stats'))
+      .where(and(eq(agentSessionMessageTable.sessionId, 's-stats'), ne(agentSessionMessageTable.role, 'root')))
     expect(row.modelId).toBe('cherryin::anthropic/claude-sonnet-4.5')
     expect(row.stats).toEqual({
       inputTokens: 8,
@@ -414,7 +417,7 @@ describe('importLegacySessionMessages', () => {
     const [row] = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-modern'))
+      .where(and(eq(agentSessionMessageTable.sessionId, 's-modern'), ne(agentSessionMessageTable.role, 'root')))
     expect(row.role).toBe('user')
     expect(row.data).toEqual({ parts: [{ type: 'text', text: 'hi' }] })
     expect(row.searchableText).toBe('hi')
@@ -439,7 +442,7 @@ describe('importLegacySessionMessages', () => {
         searchableText: agentSessionMessageTable.searchableText
       })
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-batched'))
+      .where(and(eq(agentSessionMessageTable.sessionId, 's-batched'), ne(agentSessionMessageTable.role, 'root')))
     expect(importedRows).toHaveLength(505)
     expect(new Set(importedRows.map((row) => row.ftsRowid)).size).toBe(505)
     expect(importedRows.every((row) => row.ftsRowid !== null)).toBe(true)
@@ -475,7 +478,7 @@ describe('importLegacySessionMessages', () => {
     const importedRows = await dbh.db
       .select({ id: agentSessionMessageTable.id })
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-rowid'))
+      .where(and(eq(agentSessionMessageTable.sessionId, 's-rowid'), ne(agentSessionMessageTable.role, 'root')))
     expect(importedRows).toHaveLength(505)
   })
 
@@ -522,8 +525,12 @@ describe('importLegacySessionMessages', () => {
       )
     ).toEqual([])
 
+    expect(await importLegacyRows(rows)).toBe(101)
+    expect(dbh.sqlite.pragma('foreign_key_check')).toEqual([])
     await dbh.db.insert(agentSessionMessageTable).values({
+      id: 'after-retry',
       sessionId: 's-rollback',
+      parentId: ensureAgentSessionRootTx(dbh.db, 's-rollback'),
       status: 'success',
       role: 'user',
       data: { parts: [{ type: 'text', text: 'trigger restored needle' }] } as never
@@ -531,7 +538,7 @@ describe('importLegacySessionMessages', () => {
     const [inserted] = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, 's-rollback'))
+      .where(eq(agentSessionMessageTable.id, 'after-retry'))
     expect(inserted.searchableText).toBe('trigger restored needle')
     expect(inserted.ftsRowid).not.toBeNull()
   })

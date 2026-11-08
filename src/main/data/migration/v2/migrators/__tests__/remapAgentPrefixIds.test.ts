@@ -1,5 +1,5 @@
-import { setupTestDatabase } from '@test-helpers/db'
-import { sql } from 'drizzle-orm'
+import { setupTestDatabase, seedSessionRoot } from '@test-helpers/db'
+import { eq, sql } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { agentTable } from '@data/db/schemas/agent'
@@ -76,6 +76,7 @@ describe('remapAgentPrefixIds', () => {
     await insertAgent(dbh.db, agentId)
     await insertSession(dbh.db, sessionId, agentId)
     await dbh.db.insert(agentSessionMessageTable).values({
+      parentId: seedSessionRoot(dbh.db, sessionId),
       sessionId,
       status: 'success',
       role: 'assistant',
@@ -89,7 +90,10 @@ describe('remapAgentPrefixIds', () => {
 
     const remap = remapAgentPrefixIds(dbh.db)
 
-    const [message] = await dbh.db.select().from(agentSessionMessageTable)
+    const [message] = await dbh.db
+      .select()
+      .from(agentSessionMessageTable)
+      .where(eq(agentSessionMessageTable.role, 'assistant'))
     expect(message.messageSnapshot).toMatchObject({ id: remap.agentIds.get(agentId), name: 'Test Agent' })
   })
 
@@ -118,6 +122,7 @@ describe('remapAgentPrefixIds', () => {
     await insertAgent(dbh.db, agentId)
     await insertSession(dbh.db, sessionId, agentId)
     await dbh.db.insert(agentSessionMessageTable).values({
+      parentId: seedSessionRoot(dbh.db, sessionId),
       sessionId,
       status: 'success',
       role: 'user',
@@ -162,6 +167,7 @@ describe('remapAgentPrefixIds', () => {
       await insertAgent(dbh.db, agentId)
       await insertSession(dbh.db, sessionId, agentId)
       await dbh.db.insert(agentSessionMessageTable).values({
+        parentId: seedSessionRoot(dbh.db, sessionId),
         sessionId,
         status: 'success',
         role: 'assistant',

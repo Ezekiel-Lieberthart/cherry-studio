@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { setupTestDatabase } from '@test-helpers/db'
 import Database from 'better-sqlite3'
-import { eq } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { agentTable } from '@data/db/schemas/agent'
@@ -239,7 +239,10 @@ describe('AgentsMigrator Claude session cache integration', () => {
     // MigrationDbService disables foreign keys for the migration connection;
     // reproduce that production contract while AgentsMigrator remaps prefix IDs.
     dbh.sqlite.pragma('foreign_keys = OFF')
-    await new AgentsMigrator().execute(migrationContext)
+    const migrator = new AgentsMigrator()
+    expect((await migrator.execute(migrationContext)).success).toBe(true)
+    expect(await migrator.validate(migrationContext)).toMatchObject({ success: true, errors: [] })
+    expect(dbh.sqlite.pragma('foreign_key_check')).toEqual([])
 
     const [agent] = await dbh.db.select().from(agentTable)
     const sessions = await dbh.db.select().from(agentSessionTable)
@@ -252,7 +255,7 @@ describe('AgentsMigrator Claude session cache integration', () => {
     const messages = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, session.id))
+      .where(and(eq(agentSessionMessageTable.sessionId, session.id), ne(agentSessionMessageTable.role, 'root')))
 
     expect(agent.id).not.toBe(LEGACY_AGENT_ID)
     expect(session.id).not.toBe(LEGACY_SESSION_ID)
@@ -351,7 +354,7 @@ describe('AgentsMigrator Claude session cache integration', () => {
     const messages = await dbh.db
       .select()
       .from(agentSessionMessageTable)
-      .where(eq(agentSessionMessageTable.sessionId, session.id))
+      .where(and(eq(agentSessionMessageTable.sessionId, session.id), ne(agentSessionMessageTable.role, 'root')))
 
     expect(messages.map((message) => message.runtimeResumeToken)).toEqual([
       CLAUDE_SESSION_IDS[0],

@@ -599,7 +599,10 @@ export class AgentsMigrator extends BaseMigrator {
           continue
         }
 
-        const targetRows = ctx.db.all<{ count: number }>(sql.raw(`SELECT COUNT(*) AS count FROM ${spec.targetTable}`))
+        const contentOnly = spec.targetTable === 'agent_session_message' ? " WHERE role != 'root'" : ''
+        const targetRows = ctx.db.all<{ count: number }>(
+          sql.raw(`SELECT COUNT(*) AS count FROM ${spec.targetTable}${contentOnly}`)
+        )
         const tableTargetCount = Number(targetRows[0]?.count ?? 0)
         const tableSourceCount = this.sourceCounts[spec.sourceTable]
         const validateWhere = spec.validateWhereClause ?? spec.whereClause
@@ -1602,22 +1605,40 @@ type StagedLegacySessionMessageRow = {
 function insertStagedLegacySessionMessages(db: DbType, stagedCount: number): number {
   if (stagedCount === 0) return 0
 
-  const maxFtsRowid = Number(
-    db.all<{ maxFtsRowid: number | null }>(
-      sql.raw('SELECT MAX(fts_rowid) AS maxFtsRowid FROM agent_session_message')
-    )[0]?.maxFtsRowid ?? 0
-  )
-
   db.run(sql.raw(`SAVEPOINT ${AGENT_MESSAGE_IMPORT_SAVEPOINT}`))
   try {
+    const tails = new Map<string, string>()
+    for (const { sessionId } of db.all<{ sessionId: string }>(
+      sql.raw(`SELECT DISTINCT session_id AS sessionId FROM ${LEGACY_SESSION_MESSAGE_STAGING_TABLE}`)
+    )) {
+      const root = db
+        .insert(agentSessionMessageTable)
+        .values({
+          sessionId,
+          role: 'root',
+          data: { parts: [] },
+          status: 'success'
+        })
+        .returning({ id: agentSessionMessageTable.id })
+        .get()
+      tails.set(sessionId, root.id)
+    }
+    const maxFtsRowid = Number(
+      db.all<{ maxFtsRowid: number | null }>(
+        sql.raw('SELECT MAX(fts_rowid) AS maxFtsRowid FROM agent_session_message')
+      )[0]?.maxFtsRowid ?? 0
+    )
     db.run(sql.raw(`DROP TRIGGER IF EXISTS ${AGENT_SESSION_MESSAGE_INSERT_TRIGGER_NAME}`))
-    let afterSequence = 0
+    db.run(
+      sql.raw(`CREATE INDEX agent_session_message_staged_tree_order
+      ON ${LEGACY_SESSION_MESSAGE_STAGING_TABLE} (created_at, id)`)
+    )
+    let cursor: { createdAt: number; id: string } | undefined
     let imported = 0
 
     while (imported < stagedCount) {
       const rows = db.all<StagedLegacySessionMessageRow>(
-        sql.raw(
-          `SELECT source_sequence AS sourceSequence,
+        sql`SELECT source_sequence AS sourceSequence,
                   id,
                   session_id AS sessionId,
                   role,
@@ -1630,11 +1651,10 @@ function insertStagedLegacySessionMessages(db: DbType, stagedCount: number): num
                   runtime_resume_token AS runtimeResumeToken,
                   created_at AS createdAt,
                   updated_at AS updatedAt
-           FROM ${LEGACY_SESSION_MESSAGE_STAGING_TABLE}
-           WHERE source_sequence > ${afterSequence}
-           ORDER BY source_sequence
+           FROM ${sql.raw(LEGACY_SESSION_MESSAGE_STAGING_TABLE)}
+           ${cursor ? sql`WHERE (created_at, id) > (${cursor.createdAt}, ${cursor.id})` : sql``}
+           ORDER BY created_at, id
            LIMIT ${LEGACY_SESSION_MESSAGE_BATCH_SIZE}`
-        )
       )
       if (rows.length === 0) {
         throw new Error(`Staged Agent message import stopped after ${imported}/${stagedCount} rows`)
@@ -1648,9 +1668,12 @@ function insertStagedLegacySessionMessages(db: DbType, stagedCount: number): num
         const author = sessionAuthors.get(row.sessionId)
         const modelSnapshot = row.modelSnapshot ? (JSON.parse(row.modelSnapshot) as ModelSnapshot) : null
         const messageSnapshot = author && modelSnapshot ? { ...author, model: modelSnapshot } : undefined
+        const parentId = tails.get(row.sessionId)!
+        tails.set(row.sessionId, row.id)
         return {
           id: row.id,
           sessionId: row.sessionId,
+          parentId,
           role: row.role,
           data: JSON.parse(row.data) as MessageData,
           searchableText: row.searchableText,
@@ -1667,7 +1690,11 @@ function insertStagedLegacySessionMessages(db: DbType, stagedCount: number): num
 
       db.insert(agentSessionMessageTable).values(values).run()
       imported += rows.length
-      afterSequence = rows.at(-1)!.sourceSequence
+      cursor = rows.at(-1)!
+    }
+
+    for (const [sessionId, head] of tails) {
+      db.run(sql`UPDATE agent_session SET active_node_id = ${head} WHERE id = ${sessionId}`)
     }
 
     db.run(sql.raw("INSERT INTO agent_session_message_fts(agent_session_message_fts) VALUES ('rebuild')"))
