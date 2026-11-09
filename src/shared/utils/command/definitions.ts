@@ -363,6 +363,16 @@ export const COMMAND_DEFINITIONS = [
     }
   }),
   defineCommand({
+    id: 'resource.delete_permanently',
+    titleKey: 'settings.shortcuts.delete_current_list_item',
+    categoryKey: 'settings.shortcuts.topic',
+    scope: 'renderer',
+    keybinding: {
+      defaultBinding: ['CommandOrControl', 'Backspace'],
+      when: 'resource.focused && !input.focused'
+    }
+  }),
+  defineCommand({
     id: 'assistant.next',
     titleKey: 'settings.shortcuts.next_assistant',
     categoryKey: 'settings.shortcuts.topic',

@@ -25,6 +25,10 @@
         "path": "/app/paintings"
       },
       {
+        "id": "marketplace",
+        "path": "/app/marketplace"
+      },
+      {
         "id": "translate",
         "path": "/app/translate"
       },
@@ -60,6 +64,7 @@
       "/app/files",
       "/app/knowledge",
       "/app/launchpad",
+      "/app/marketplace",
       "/app/notes",
       "/app/release-notes",
       "/app/scheduled-tasks",
@@ -582,6 +587,19 @@
           "CommandOrControl",
           "]"
         ]
+      }
+    },
+    {
+      "id": "resource.delete_permanently",
+      "titleKey": "settings.shortcuts.delete_current_list_item",
+      "categoryKey": "settings.shortcuts.topic",
+      "scope": "renderer",
+      "keybinding": {
+        "defaultBinding": [
+          "CommandOrControl",
+          "Backspace"
+        ],
+        "when": "resource.focused && !input.focused"
       }
     },
     {
