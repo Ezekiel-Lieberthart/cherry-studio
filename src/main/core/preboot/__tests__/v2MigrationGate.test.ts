@@ -906,11 +906,36 @@ describe('runV2MigrationGate', () => {
       expect(saveBundleMock).toHaveBeenCalledWith({
         destination: '/tmp/diagnostics.zip',
         stage: 'error',
-        logDate: new Date().toISOString().slice(0, 10)
+        logDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
       })
       expect(showMessageBoxMock.mock.calls[0][0].buttons.at(-1)).toBe('Export diagnostics')
       expect(showMessageBoxMock.mock.calls[1][0].detail).not.toContain('That action failed')
       expect(appQuitMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('exports the local day logs when the local date is ahead of UTC', async () => {
+      const originalTimezone = process.env.TZ
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        process.env.TZ = 'Asia/Shanghai'
+        vi.setSystemTime(new Date('2026-11-08T16:30:00Z'))
+        failPin()
+        showMessageBoxMock.mockResolvedValueOnce({ response: 4 }).mockResolvedValueOnce({ response: 0 })
+        showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/diagnostics.zip' })
+        saveBundleMock.mockResolvedValue('included')
+        stubMigrationV2()
+        stubElectron()
+        stubApplication()
+
+        const { runV2MigrationGate } = await loadModule()
+        await runV2MigrationGate()
+
+        expect(saveBundleMock).toHaveBeenCalledWith(expect.objectContaining({ logDate: '2026-11-09' }))
+      } finally {
+        vi.useRealTimers()
+        if (originalTimezone === undefined) delete process.env.TZ
+        else process.env.TZ = originalTimezone
+      }
     })
 
     it('returns to the dialog when the export save is canceled', async () => {

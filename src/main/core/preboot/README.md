@@ -133,6 +133,9 @@ preboot/
 │                        orchestrating-gate shape is tolerated only
 │                        because it is throwaway — do not copy it for
 │                        permanent capabilities.
+├── nativeErrorDialog.ts showSupportedMessageBox(): native error dialog with
+│                        Copy / Feedback / Releases support actions; usable
+│                        before any window or lifecycle service exists
 └── __tests__/           unit tests for each sibling module
 ```
 

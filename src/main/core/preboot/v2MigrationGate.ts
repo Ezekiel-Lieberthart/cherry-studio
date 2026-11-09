@@ -11,6 +11,7 @@
 
 import { promises as fs } from 'node:fs'
 
+import dayjs from 'dayjs'
 import { app, dialog } from 'electron'
 
 import { application } from '@application'
@@ -97,7 +98,8 @@ export type V2MigrationGateResult = 'handled' | 'skipped'
  * and loop (or make migrated data appear lost). Stop loudly instead.
  */
 function migrationSupportAction(language: PrebootLanguage, stage: MigrationStage = 'error') {
-  const logDate = new Date().toISOString().slice(0, 10)
+  // Log files rotate by local date, so the bundle must ask for the local day.
+  const logDate = dayjs().format('YYYY-MM-DD')
   return {
     label: t('dialog.support.migration_export', undefined, language),
     run: async () => {
