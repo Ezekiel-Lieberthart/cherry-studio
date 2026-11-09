@@ -43,3 +43,13 @@ OR (m.parent_id IS NOT NULL AND NOT EXISTS (
 ));
 --> statement-breakpoint
 DROP TABLE agent_session_tree_integrity;
+--> statement-breakpoint
+-- Fresh databases have not replayed custom SQL yet; upgrades must also index the new empty roots.
+CREATE VIRTUAL TABLE IF NOT EXISTS agent_session_message_fts USING fts5(
+  searchable_text,
+  content='agent_session_message',
+  content_rowid='fts_rowid',
+  tokenize='trigram'
+);
+--> statement-breakpoint
+INSERT INTO agent_session_message_fts(agent_session_message_fts) VALUES ('rebuild');
