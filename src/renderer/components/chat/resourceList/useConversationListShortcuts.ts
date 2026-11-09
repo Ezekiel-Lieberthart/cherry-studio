@@ -1,7 +1,7 @@
-import { use, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
-import { CommandFocusScopeContext } from '@renderer/hooks/command'
-import { useIsActiveTab, useTabCommandRuntime } from '@renderer/hooks/tab'
+import { useCommandRuntime } from '@renderer/hooks/command'
+import { useIsActiveTab } from '@renderer/hooks/tab'
 import { useNumberShortcutHints } from '@renderer/hooks/useNumberShortcutHints'
 import { CONVERSATION_NUMBER_COMMANDS as CONVERSATION_COMMANDS } from '@renderer/utils/numberShortcuts'
 
@@ -11,8 +11,7 @@ export function useConversationListShortcuts<T extends ResourceListItemBase>(onO
   const view = useResourceListView<T>()
   const { status } = useResourceListControlsState()
   const active = useIsActiveTab()
-  const listScope = use(CommandFocusScopeContext)
-  const runtime = useTabCommandRuntime()
+  const runtime = useCommandRuntime()
   const items = useMemo(() => {
     const groups =
       view.sections.length > 0
@@ -34,11 +33,11 @@ export function useConversationListShortcuts<T extends ResourceListItemBase>(onO
         () => {
           if (item) onOpen(item)
         },
-        { enabled: () => !!item && (listScope?.isActive() ?? true) }
+        { enabled: Boolean(item) }
       )
     })
     return () => dispose.forEach((remove) => remove())
-  }, [enabled, items, listScope, onOpen, runtime])
+  }, [enabled, items, onOpen, runtime])
 
   return useMemo(() => {
     const hints = new Map<string, string>()
