@@ -218,7 +218,7 @@ describe('SkillDetails', () => {
     expect(screen.getByText('settings.skills.notFound')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'common.back' })).toBeInTheDocument()
     expect(screen.queryByText(missing.message)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'error.details' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'common.detail' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('skill-file-browser')).not.toBeInTheDocument()
   })
 
@@ -227,7 +227,7 @@ describe('SkillDetails', () => {
     render(<SkillDetails skillId="skill-1" />)
 
     expect(screen.getByText('error.unexpected')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'error.details' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'common.detail' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'common.back' })).toBeInTheDocument()
     expect(screen.queryByText('database locked')).not.toBeInTheDocument()
     expect(screen.queryByText('settings.skills.notFound')).not.toBeInTheDocument()
@@ -239,7 +239,7 @@ describe('SkillDetails', () => {
     render(<SkillDetails skillId="skill-1" />)
 
     expect(screen.getByText('library.skill_detail.file_load_failed')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'error.details' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'common.detail' })).toBeInTheDocument()
     expect(screen.queryByText('folder missing on disk')).not.toBeInTheDocument()
     expect(screen.queryByText('library.skill_detail.no_files')).not.toBeInTheDocument()
     expect(screen.queryByTestId('skill-file-browser')).not.toBeInTheDocument()
