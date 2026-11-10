@@ -611,7 +611,7 @@ describe('AgentToolRenderer', () => {
       expect(screen.getByText('View')).toBeInTheDocument()
       expect(screen.getByText('Error')).toHaveStyle('color: var(--muted-foreground)')
       const disclosure = screen.getByRole('button', { expanded: false })
-      const details = screen.getByRole('button', { name: 'error.details' })
+      const details = screen.getByRole('button', { name: 'common.detail' })
       expect(disclosure).not.toContainElement(details)
       await user.click(disclosure)
       expect(disclosure).toHaveAttribute('aria-expanded', 'true')
@@ -1284,7 +1284,7 @@ describe('AgentToolRenderer', () => {
 
       render(<AgentToolRenderer toolResponse={toolResponse} />)
       const disclosure = screen.getByRole('button', { expanded: false })
-      const details = screen.getByRole('button', { name: 'error.details' })
+      const details = screen.getByRole('button', { name: 'common.detail' })
       expect(disclosure).not.toContainElement(details)
       await user.click(disclosure)
       expect(disclosure).toHaveAttribute('aria-expanded', 'true')
