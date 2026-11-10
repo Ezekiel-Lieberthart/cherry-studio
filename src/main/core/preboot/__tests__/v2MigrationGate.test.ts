@@ -377,9 +377,8 @@ describe('runV2MigrationGate', () => {
       expect(showMessageBoxMock.mock.calls[0][0]).toMatchObject({
         title: '数据库不可用',
         message: 'Cherry Studio 无法访问本地数据库。',
-        detail:
-          '请检查数据存储位置是否可用且可写，并确保磁盘有足够的可用空间，然后重试。\n\n自动分析不可用。你可以复制错误、发送反馈或打开官方发布页。',
-        buttons: ['重试', '退出', '复制错误', '发送反馈', '打开发布页', '导出诊断信息'],
+        detail: '请检查数据存储位置是否可用且可写，并确保磁盘有足够的可用空间，然后重试。',
+        buttons: ['重试', '退出', '导出诊断信息', '复制错误并反馈…'],
         defaultId: 0,
         cancelId: 1
       })
@@ -746,7 +745,6 @@ describe('runV2MigrationGate', () => {
       // Regression: the old dialog only had Retry/Quit, dead-ending abandoned dirs.
       const [{ buttons }] = showMessageBoxMock.mock.calls[0]
       expect(buttons.slice(0, 3)).toEqual(['Retry', 'Use Default Directory', 'Quit'])
-      expect(buttons).toContain('Copy error')
       expect(appRelaunchMock).toHaveBeenCalledTimes(1)
       expect(pinUserDataPathMock).not.toHaveBeenCalled()
       expect(initializeMock).not.toHaveBeenCalled()
@@ -791,7 +789,7 @@ describe('runV2MigrationGate', () => {
     it('quits with a fatal error when pinning the default dir fails on Use Default (response 1)', async () => {
       stubInaccessible()
       // The first dialog's Use Default is response 1. The failure dialog's only
-      // primary button is Exit at 0; response 1 there is Copy and would loop.
+      // primary button is Exit at 0; response 1 there is Export and would loop.
       showMessageBoxMock.mockResolvedValueOnce({ response: 1 }).mockResolvedValue({ response: 0 })
       // Strict pin persistence fails — must not silently proceed into migration
       // on an unpersisted pin (that would relaunch into the old dir and loop).
@@ -888,7 +886,7 @@ describe('runV2MigrationGate', () => {
 
     it('writes the migration bundle from the export button and returns to the dialog', async () => {
       failPin()
-      showMessageBoxMock.mockResolvedValueOnce({ response: 4 }).mockResolvedValueOnce({ response: 0 })
+      showMessageBoxMock.mockResolvedValueOnce({ response: 1 }).mockResolvedValueOnce({ response: 0 })
       showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/diagnostics.zip' })
       saveBundleMock.mockResolvedValue('included')
       stubMigrationV2()
@@ -908,8 +906,8 @@ describe('runV2MigrationGate', () => {
         stage: 'error',
         logDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
       })
-      expect(showMessageBoxMock.mock.calls[0][0].buttons.at(-1)).toBe('Export diagnostics')
-      expect(showMessageBoxMock.mock.calls[1][0].detail).not.toContain('That action failed')
+      expect(showMessageBoxMock.mock.calls[0][0].buttons[1]).toBe('Export diagnostics')
+      expect(showMessageBoxMock.mock.calls[1][0].detail ?? '').not.toContain('That action failed')
       expect(appQuitMock).toHaveBeenCalledTimes(1)
     })
 
@@ -920,7 +918,7 @@ describe('runV2MigrationGate', () => {
         process.env.TZ = 'Asia/Shanghai'
         vi.setSystemTime(new Date('2026-11-08T16:30:00Z'))
         failPin()
-        showMessageBoxMock.mockResolvedValueOnce({ response: 4 }).mockResolvedValueOnce({ response: 0 })
+        showMessageBoxMock.mockResolvedValueOnce({ response: 1 }).mockResolvedValueOnce({ response: 0 })
         showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/diagnostics.zip' })
         saveBundleMock.mockResolvedValue('included')
         stubMigrationV2()
@@ -940,7 +938,7 @@ describe('runV2MigrationGate', () => {
 
     it('returns to the dialog when the export save is canceled', async () => {
       failPin()
-      showMessageBoxMock.mockResolvedValueOnce({ response: 4 }).mockResolvedValueOnce({ response: 0 })
+      showMessageBoxMock.mockResolvedValueOnce({ response: 1 }).mockResolvedValueOnce({ response: 0 })
       showSaveDialogMock.mockResolvedValue({ canceled: true, filePath: '' })
       stubMigrationV2()
       stubElectron()
@@ -951,13 +949,13 @@ describe('runV2MigrationGate', () => {
 
       expect(saveBundleMock).not.toHaveBeenCalled()
       expect(showMessageBoxMock).toHaveBeenCalledTimes(2)
-      expect(showMessageBoxMock.mock.calls[1][0].detail).not.toContain('Could not write the diagnostic archive')
+      expect(showMessageBoxMock.mock.calls[1][0].detail ?? '').not.toContain('Could not write the diagnostic archive')
       expect(appQuitMock).toHaveBeenCalledTimes(1)
     })
 
     it('keeps a failed archive write on the dialog and still quits from the original button', async () => {
       failPin()
-      showMessageBoxMock.mockResolvedValueOnce({ response: 4 }).mockResolvedValueOnce({ response: 0 })
+      showMessageBoxMock.mockResolvedValueOnce({ response: 1 }).mockResolvedValueOnce({ response: 0 })
       showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/diagnostics.zip' })
       saveBundleMock.mockResolvedValue(false)
       stubMigrationV2()
